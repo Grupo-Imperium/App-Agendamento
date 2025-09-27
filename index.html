@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Agendamento de Consultas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa;
+        }
+        .form-container {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+            border: 1px solid #e5e7eb;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #374151;
+        }
+        input[type="text"],
+        input[type="email"],
+        input[type="date"],
+        input[type="tel"],
+        input[type="password"],
+        input[type="number"],
+        input[type="time"],
+        textarea, select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #D1D5DB;
+            border-radius: 0.5rem;
+            transition: border-color 0.2s;
+        }
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+        }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            color: white;
+            background-color: #4f46e5;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .btn:hover {
+            background-color: #4338ca;
+        }
+        .btn-secondary {
+            background-color: #e5e7eb;
+            color: #374151;
+        }
+        .btn-secondary:hover {
+            background-color: #d1d5db;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .step-indicator {
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+        }
+        .step-indicator.active {
+            color: #4f46e5;
+            border-color: #4f46e5;
+            background-color: #eef2ff;
+        }
+
+        .dashboard-card {
+            background-color: white;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+            border: 1px solid #e5e7eb;
+        }
+        .tooltip {
+            position: absolute;
+            background-color: #1f2937;
+            color: white;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            z-index: 100;
+            display: none;
+            pointer-events: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #print-area, #print-area * {
+                visibility: visible;
+            }
+            #print-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body class="antialiased text-gray-800">
+
+    <div id="app" class="max-w-7xl mx-auto p-4 md:p-8">
+
+        <header id="main-header" class="bg-white p-4 rounded-lg shadow-md mb-8 flex justify-between items-center">
+            <h1 class="text-2xl md:text-3xl font-bold text-indigo-600">Painel de Consultas</h1>
+            <div class="flex items-center space-x-4">
+                <button id="patient-view-btn" class="font-semibold text-gray-500 hover:text-indigo-600 transition">Agendar Consulta</button>
+                <button id="admin-view-btn" class="font-semibold text-gray-500 hover:text-indigo-600 transition">Área do Administrador</button>
+            </div>
+        </header>
+        
+        <div id="error-box" class="fixed top-5 right-5 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg hidden z-[60]" role="alert">
+            <strong class="font-bold">Acesso Negado!</strong>
+            <span class="block sm:inline">A senha está incorreta.</span>
+        </div>
+        <div id="loading-overlay" class="fixed inset-0 bg-white bg-opacity-70 z-50 flex items-center justify-center hidden">
+            <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-600"></div>
+        </div>
+        <div id="admin-login-modal" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 hidden">
+             <div class="bg-white rounded-lg shadow-xl max-w-sm w-full p-8">
+                 <h3 class="text-2xl font-bold mb-6 text-center">Acesso Restrito</h3>
+                 <form id="admin-login-form">
+                     <label for="admin-password" class="mb-2">Senha de Administrador</label>
+                     <input type="password" id="admin-password" required class="mb-4">
+                     <button type="submit" class="btn w-full">Entrar</button>
+                 </form>
+             </div>
+        </div>
+
+        <main id="patient-flow">
+            <div id="consultation-type-selection" class="max-w-2xl mx-auto">
+                <h2 class="text-3xl font-bold mb-8 text-center">Antes, deixa eu entender melhor..</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <button id="first-consultation-btn" class="group bg-white p-8 rounded-lg shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 text-left border border-gray-200">
+                        <div class="bg-indigo-100 text-indigo-600 rounded-full h-12 w-12 flex items-center justify-center mb-4">
+                            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2 text-gray-800">É minha primeira consulta</h3>
+                        <p class="text-gray-600">Preencha um questionário completo para um atendimento personalizado.</p>
+                    </button>
+                    <button id="return-consultation-btn" class="group bg-white p-8 rounded-lg shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 text-left border border-gray-200">
+                        <div class="bg-teal-100 text-teal-600 rounded-full h-12 w-12 flex items-center justify-center mb-4">
+                             <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2 text-gray-800">Sou paciente de retorno</h3>
+                        <p class="text-gray-600">Já tem cadastro? Agende seu retorno de forma rápida.</p>
+                    </button>
+                </div>
+            </div>
+
+            <div id="returning-patient-view" class="hidden max-w-lg mx-auto">
+                <h2 class="text-3xl font-bold mb-6 text-center">Agendar Retorno</h2>
+                <form id="returning-patient-form" class="form-container space-y-4">
+                    <div><label for="return-fullName">Nome completo:</label><input type="text" id="return-fullName" required></div>
+                    <div><label for="return-phone">Telefone / WhatsApp:</label><input type="tel" id="return-phone" required></div>
+                    <button type="submit" class="btn w-full">Prosseguir para Agendamento</button>
+                </form>
+            </div>
+            
+            <div id="form-view" class="hidden">
+                <div class="max-w-4xl mx-auto">
+                    <h2 class="text-3xl font-bold mb-2 text-center">Questionário Pré-Consulta</h2>
+                    <p class="text-gray-600 mb-8 text-center">Responda com sinceridade. Suas respostas vão guiar sua transformação.</p>
+                    
+                    <div class="form-container">
+                        <div class="mb-8">
+                            <div class="flex justify-between mb-1">
+                                <span class="text-base font-medium text-indigo-700">Progresso</span>
+                                <span id="progress-text" class="text-sm font-medium text-indigo-700">1 de 4</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                <div id="progress-bar" class="bg-indigo-600 h-2.5 rounded-full" style="width: 25%"></div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-8">
+                           <button data-step="1" class="step-indicator active flex flex-col items-center p-3 rounded-lg">
+                               <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                               <span class="text-sm font-medium">Dados Básicos</span>
+                           </button>
+                           <button data-step="2" class="step-indicator flex flex-col items-center p-3 rounded-lg">
+                               <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                               <span class="text-sm font-medium">Saúde e Corpo</span>
+                           </button>
+                           <button data-step="3" class="step-indicator flex flex-col items-center p-3 rounded-lg">
+                               <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 15.536c-1.171 1.952-3.07 1.952-4.242 0-1.172-1.953-1.172-5.119 0-7.072 1.171-1.952 3.07-1.952 4.242 0 1.172 1.953 1.172 5.119 0 7.072z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21a9.004 9.004 0 008.685-6.954 9.005 9.005 0 00-17.37 0A9.004 9.004 0 0012 21z"></path></svg>
+                               <span class="text-sm font-medium">Alimentação</span>
+                           </button>
+                           <button data-step="4" class="step-indicator flex flex-col items-center p-3 rounded-lg">
+                               <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                               <span class="text-sm font-medium">Expectativas</span>
+                           </button>
+                        </div>
+                        
+                        <form id="pre-consultation-form">
+                            <div id="form-step-1" class="form-step">
+                                <h3 class="text-xl font-semibold mb-6 border-b pb-2">Seção 1 de 4: Dados Básicos</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div><label for="fullName">Nome completo:</label><input type="text" id="fullName" name="fullName"></div>
+                                    <div><label for="email">E-mail:</label><input type="email" id="email" name="email"></div>
+                                    <div><label for="phone">Telefone / WhatsApp:</label><input type="tel" id="phone" name="phone" placeholder="(XX) XXXXX-XXXX"></div>
+                                    <div><label for="dob">Data de nascimento:</label><input type="date" id="dob" name="dob"></div>
+                                    <div><label for="cityState">Cidade/Estado:</label><input type="text" id="cityState" name="cityState"></div>
+                                    <div><label for="profession">Profissão:</label><input type="text" id="profession" name="profession"></div>
+                                </div>
+                            </div>
+                            <div id="form-step-2" class="form-step hidden">
+                                <h3 class="text-xl font-semibold mb-6 border-b pb-2">Seção 2 de 4: Saúde e Corpo</h3>
+                                <div class="space-y-6">
+                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div><label for="weight">Peso atual (kg):</label><input type="number" step="0.1" id="weight" name="weight"></div>
+                                        <div><label for="height">Altura (cm):</label><input type="number" id="height" name="height"></div>
+                                    </div>
+                                    <div><label for="healthConditions">Diagnóstico de alguma condição de saúde?</label><textarea id="healthConditions" name="healthConditions" rows="3"></textarea></div>
+                                    <div><label for="medications">Faz uso de medicamentos contínuos? Quais?</label><textarea id="medications" name="medications" rows="3"></textarea></div>
+                                </div>
+                            </div>
+                            <div id="form-step-3" class="form-step hidden">
+                                <h3 class="text-xl font-semibold mb-6 border-b pb-2">Seção 3 de 4: Alimentação e Hábitos</h3>
+                                <div class="space-y-4">
+                                    <div><label for="mainMeals">Quantas refeições principais por dia?</label><input type="number" id="mainMeals" name="mainMeals"></div>
+                                    <div><label for="foodDiary">Descreva sua alimentação nas últimas 24h.</label><textarea id="foodDiary" name="foodDiary" rows="4"></textarea></div>
+                                    <div><label for="controlFoods">Alimento que sente "não conseguir controlar"?</label><textarea id="controlFoods" name="controlFoods" rows="3"></textarea></div>
+                                </div>
+                            </div>
+                             <div id="form-step-4" class="form-step hidden">
+                                <h3 class="text-xl font-semibold mb-6 border-b pb-2">Seção 4 de 4: Expectativas</h3>
+                                <div class="space-y-4">
+                                    <div><label for="whyNow">Por que você escolheu começar agora?</label><textarea id="whyNow" name="whyNow" rows="3"></textarea></div>
+                                    <div><label for="threeMonthGoal">Maior resultado que gostaria nos próximos 3 meses?</label><textarea id="threeMonthGoal" name="threeMonthGoal" rows="4"></textarea></div>
+                                </div>
+                            </div>
+                        </form>
+                        <div class="flex justify-between mt-8 pt-6 border-t">
+                            <button id="prev-step-btn" class="btn btn-secondary">Anterior</button>
+                            <button id="next-step-btn" class="btn">Próximo</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="scheduler-view" class="hidden">
+                 <div class="bg-white p-6 md:p-8 rounded-lg shadow-md">
+                    <h2 class="text-2xl font-bold text-center mb-6">Selecione o dia e horário da consulta</h2>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div>
+                            <div class="flex items-center justify-between mb-4">
+                                <button id="prev-month" class="p-2 rounded-full hover:bg-gray-100">&lt;</button>
+                                <h3 id="month-year" class="text-xl font-semibold"></h3>
+                                <button id="next-month" class="p-2 rounded-full hover:bg-gray-100">&gt;</button>
+                            </div>
+                            <div id="calendar-grid" class="grid grid-cols-7 gap-1 text-center"></div>
+                        </div>
+                        <div class="flex flex-col">
+                            <h3 class="text-xl font-semibold mb-4 text-center lg:text-left">Horários para <span id="selected-date-span" class="text-indigo-600"></span></h3>
+                            <div id="time-slots" class="grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto max-h-80 no-scrollbar"></div>
+                        </div>
+                    </div>
+                 </div>
+            </div>
+
+            <div id="confirmation-view" class="hidden">
+                <div class="bg-white p-8 rounded-lg shadow-md text-center max-w-2xl mx-auto">
+                    <svg class="w-16 h-16 mx-auto text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <h2 class="text-3xl font-bold mt-4 mb-2">Agendamento Confirmado!</h2>
+                    <p class="text-gray-600 text-lg">Sua consulta foi agendada com sucesso para:</p>
+                    <p id="confirmation-details" class="text-xl font-semibold my-4 bg-indigo-50 p-4 rounded-md text-indigo-700"></p>
+                    <p class="text-gray-500 mt-4">Fique atento(a)! Entraremos em contato de 5 a 10 minutos antes do seu horário agendado para iniciar o atendimento via Google Meet.</p>
+                </div>
+            </div>
+        </main>
+
+        <aside id="admin-view" class="hidden space-y-8">
+            <div class="bg-white p-6 md:p-8 rounded-lg shadow-md">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex items-center gap-4">
+                        <h2 class="text-2xl font-bold">Painel do Administrador</h2>
+                        <button id="add-patient-btn" title="Adicionar Paciente Manualmente" class="bg-indigo-600 hover:bg-indigo-700 text-white w-10 h-10 rounded-full flex items-center justify-center transition-transform transform hover:scale-110 shadow-md">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                        </button>
+                    </div>
+                    <button id="settings-btn" title="Configurações de Horários" class="text-gray-500 hover:text-indigo-600 transition">
+                         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    </button>
+                </div>
+                <div id="birthday-notification-area" class="mb-4"></div>
+                <div id="admin-stats" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+                <div id="next-appointment-info" class="mt-6 text-center text-gray-600 bg-gray-50 p-3 rounded-md"></div>
+            </div>
+            
+            <div class="bg-white p-6 md:p-8 rounded-lg shadow-md">
+                <div class="flex flex-col md:flex-row gap-4 mb-6 justify-between items-center">
+                    <div class="flex-grow flex gap-4">
+                        <div id="scheduled-filters" class="flex-grow flex gap-4">
+                             <input type="text" id="search-input" placeholder="Buscar por nome..." class="flex-grow max-w-xs">
+                             <select id="status-filter">
+                                <option value="all">Todos os Status</option>
+                                <option value="Agendado">Agendado</option>
+                                <option value="Cancelado">Cancelado</option>
+                                <option value="Não Compareceu">Não Compareceu</option>
+                             </select>
+                        </div>
+                        <div id="completed-filters" class="flex-grow hidden">
+                             <input type="text" id="search-completed-input" placeholder="Buscar em realizados..." class="flex-grow max-w-xs">
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button id="print-today-btn" class="btn btn-secondary flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm7-8a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                            Imprimir
+                        </button>
+                        <button id="inactive-report-btn" class="btn btn-secondary flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 5.523-4.477 10-10 10S1 17.523 1 12 5.477 2 11 2s10 4.477 10 10z"></path></svg>
+                            Inativos
+                        </button>
+                        <button id="open-calendar-btn" class="btn btn-secondary flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                            Calendário
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="border-b border-gray-200">
+                    <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                        <button id="tab-scheduled" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-indigo-500 text-indigo-600">
+                            Agendamentos
+                        </button>
+                        <button id="tab-completed" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                            Consultas Realizadas
+                        </button>
+                    </nav>
+                </div>
+
+                <div id="scheduled-appointments-view" class="mt-6">
+                    <div id="scheduled-appointments-counter" class="text-sm text-gray-500 mb-2"></div>
+                    <div id="scheduled-appointments-list" class="space-y-4"></div>
+                </div>
+                <div id="completed-appointments-view" class="mt-6 hidden">
+                    <div id="completed-appointments-counter" class="text-sm text-gray-500 mb-2"></div>
+                    <div id="completed-appointments-list" class="space-y-4"></div>
+                </div>
+
+            </div>
+        </aside>
+        
+        <div id="appointment-modal" class="fixed inset-0 bg-black bg-opacity-60 z-40 flex items-center justify-center p-4 hidden">
+             <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto relative p-6 md:p-8">
+                <button id="close-modal-btn" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                <div id="modal-body">
+                    <h3 class="text-2xl font-bold mb-6">Informações da Pré-Consulta</h3>
+                    <div id="modal-patient-data" class="space-y-4 mb-8"></div>
+                    
+                    <div class="border-t pt-6">
+                         <h3 class="text-xl font-bold mb-4">Detalhes Financeiros</h3>
+                         <div>
+                             <label for="payment-value">Valor Pago (R$):</label>
+                             <input type="number" id="payment-value" step="0.01" class="w-full max-w-xs" placeholder="0.00">
+                             <span id="payment-saved-feedback" class="text-sm text-green-600 hidden ml-2">Salvo!</span>
+                         </div>
+                    </div>
+
+                    <div class="border-t pt-6 mt-6">
+                         <h3 class="text-xl font-bold mb-4">Anotações Confidenciais</h3>
+                         <textarea id="admin-notes" rows="5" class="w-full" placeholder="Digite suas anotações aqui..."></textarea>
+                         <div class="text-right mt-2">
+                            <span id="notes-saved-feedback" class="text-sm text-green-600 hidden">Anotações salvas!</span>
+                         </div>
+                    </div>
+                </div>
+             </div>
+        </div>
+
+        <div id="admin-calendar-modal" class="fixed inset-0 bg-black bg-opacity-60 z-40 flex items-center justify-center p-4 hidden">
+             <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full relative p-6 md:p-8">
+                <button id="close-calendar-modal-btn" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
+                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                <h3 class="text-xl font-bold mb-4">Calendário de Consultas</h3>
+                <div class="flex items-center justify-between mb-4">
+                    <button id="admin-prev-month" class="p-2 rounded-full hover:bg-gray-100 transition-colors">&lt;</button>
+                    <h4 id="admin-month-year" class="text-lg font-semibold"></h4>
+                    <button id="admin-next-month" class="p-2 rounded-full hover:bg-gray-100 transition-colors">&gt;</button>
+                </div>
+                <div id="admin-calendar-grid" class="grid grid-cols-7 gap-1"></div>
+             </div>
+        </div>
+        
+        <div id="daily-appointments-modal" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 hidden">
+             <div class="bg-white rounded-lg shadow-xl max-w-lg w-full relative p-6 md:p-8">
+                <button id="close-daily-modal-btn" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
+                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                <h3 id="daily-modal-title" class="text-2xl font-bold mb-6">Consultas do Dia</h3>
+                <div id="daily-modal-content" class="space-y-3 max-h-[60vh] overflow-y-auto"></div>
+             </div>
+        </div>
+
+        <div id="add-patient-modal" class="fixed inset-0 bg-black bg-opacity-60 z-40 flex items-center justify-center p-4 hidden">
+             <div class="bg-white rounded-lg shadow-xl max-w-lg w-full relative p-6 md:p-8">
+                 <button id="close-add-patient-modal-btn" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
+                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                 </button>
+                 <h3 class="text-2xl font-bold mb-6">Adicionar Novo Agendamento</h3>
+                 <form id="add-patient-form" class="space-y-4">
+                     <div>
+
