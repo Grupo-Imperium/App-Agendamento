@@ -1,0 +1,1487 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Agendamento de Consultas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa;
+        }
+        .form-container {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+            border: 1px solid #e5e7eb;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #374151;
+        }
+        input[type="text"],
+        input[type="email"],
+        input[type="date"],
+        input[type="tel"],
+        input[type="password"],
+        input[type="number"],
+        input[type="time"],
+        textarea, select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #D1D5DB;
+            border-radius: 0.5rem;
+            transition: border-color 0.2s;
+        }
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+        }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            color: white;
+            background-color: #4f46e5;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .btn:hover {
+            background-color: #4338ca;
+        }
+        .btn-secondary {
+            background-color: #e5e7eb;
+            color: #374151;
+        }
+        .btn-secondary:hover {
+            background-color: #d1d5db;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .step-indicator {
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+        }
+        .step-indicator.active {
+            color: #4f46e5;
+            border-color: #4f46e5;
+            background-color: #eef2ff;
+        }
+
+        .dashboard-card {
+            background-color: white;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+            border: 1px solid #e5e7eb;
+        }
+        .tooltip {
+            position: absolute;
+            background-color: #1f2937;
+            color: white;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            z-index: 100;
+            display: none;
+            pointer-events: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #print-area, #print-area * {
+                visibility: visible;
+            }
+            #print-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body class="antialiased text-gray-800">
+
+    <div id="app" class="max-w-7xl mx-auto p-4 md:p-8">
+        
+        <div id="error-box" class="fixed top-5 right-5 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg hidden z-[60]" role="alert">
+            <strong class="font-bold">Acesso Negado!</strong>
+            <span class="block sm:inline">A senha está incorreta.</span>
+        </div>
+        <div id="loading-overlay" class="fixed inset-0 bg-white bg-opacity-70 z-50 flex items-center justify-center hidden">
+            <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-600"></div>
+        </div>
+        <div id="admin-login-modal" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 hidden">
+             <div class="bg-white rounded-lg shadow-xl max-w-sm w-full p-8">
+                 <h3 class="text-2xl font-bold mb-6 text-center">Acesso Restrito</h3>
+                 <form id="admin-login-form">
+                     <label for="admin-password" class="mb-2">Senha de Administrador</label>
+                     <input type="password" id="admin-password" required class="mb-4">
+                     <button type="submit" class="btn w-full">Entrar</button>
+                 </form>
+             </div>
+        </div>
+
+        <main id="patient-flow">
+            <div id="consultation-type-selection" class="max-w-2xl mx-auto">
+                <h2 class="text-3xl font-bold mb-8 text-center">Antes, deixa eu entender melhor..</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <button id="first-consultation-btn" class="group bg-white p-8 rounded-lg shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 text-left border border-gray-200">
+                        <div class="bg-indigo-100 text-indigo-600 rounded-full h-12 w-12 flex items-center justify-center mb-4">
+                            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2 text-gray-800">É minha primeira consulta</h3>
+                        <p class="text-gray-600">Preencha um questionário completo para um atendimento personalizado.</p>
+                    </button>
+                    <button id="return-consultation-btn" class="group bg-white p-8 rounded-lg shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 text-left border border-gray-200">
+                        <div class="bg-teal-100 text-teal-600 rounded-full h-12 w-12 flex items-center justify-center mb-4">
+                             <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2 text-gray-800">Sou paciente de retorno</h3>
+                        <p class="text-gray-600">Já tem cadastro? Agende seu retorno de forma rápida.</p>
+                    </button>
+                </div>
+            </div>
+
+            <div id="returning-patient-view" class="hidden max-w-lg mx-auto">
+                <h2 class="text-3xl font-bold mb-6 text-center">Agendar Retorno</h2>
+                <form id="returning-patient-form" class="form-container space-y-4">
+                    <div><label for="return-fullName">Nome completo:</label><input type="text" id="return-fullName" required></div>
+                    <div><label for="return-phone">Telefone / WhatsApp:</label><input type="tel" id="return-phone" required></div>
+                    <button type="submit" class="btn w-full">Prosseguir para Agendamento</button>
+                </form>
+            </div>
+            
+            <div id="form-view" class="hidden">
+                <div class="max-w-4xl mx-auto">
+                    <h2 class="text-3xl font-bold mb-2 text-center">Questionário Pré-Consulta</h2>
+                    <p class="text-gray-600 mb-8 text-center">Responda com sinceridade. Suas respostas vão guiar sua transformação.</p>
+                    
+                    <div class="form-container">
+                        <div class="mb-8">
+                            <div class="flex justify-between mb-1">
+                                <span class="text-base font-medium text-indigo-700">Progresso</span>
+                                <span id="progress-text" class="text-sm font-medium text-indigo-700">1 de 4</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                <div id="progress-bar" class="bg-indigo-600 h-2.5 rounded-full" style="width: 25%"></div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-8">
+                           <button data-step="1" class="step-indicator active flex flex-col items-center p-3 rounded-lg">
+                               <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                               <span class="text-sm font-medium">Dados Básicos</span>
+                           </button>
+                           <button data-step="2" class="step-indicator flex flex-col items-center p-3 rounded-lg">
+                               <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                               <span class="text-sm font-medium">Saúde e Corpo</span>
+                           </button>
+                           <button data-step="3" class="step-indicator flex flex-col items-center p-3 rounded-lg">
+                               <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 15.536c-1.171 1.952-3.07 1.952-4.242 0-1.172-1.953-1.172-5.119 0-7.072 1.171-1.952 3.07-1.952 4.242 0 1.172 1.953 1.172 5.119 0 7.072z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21a9.004 9.004 0 008.685-6.954 9.005 9.005 0 00-17.37 0A9.004 9.004 0 0012 21z"></path></svg>
+                               <span class="text-sm font-medium">Alimentação</span>
+                           </button>
+                           <button data-step="4" class="step-indicator flex flex-col items-center p-3 rounded-lg">
+                               <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                               <span class="text-sm font-medium">Expectativas</span>
+                           </button>
+                        </div>
+                        
+                        <form id="pre-consultation-form">
+                            <div id="form-step-1" class="form-step">
+                                <h3 class="text-xl font-semibold mb-6 border-b pb-2">Seção 1 de 4: Dados Básicos</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div><label for="fullName">Nome completo:</label><input type="text" id="fullName" name="fullName"></div>
+                                    <div><label for="email">E-mail:</label><input type="email" id="email" name="email"></div>
+                                    <div><label for="phone">Telefone / WhatsApp:</label><input type="tel" id="phone" name="phone" placeholder="(XX) XXXXX-XXXX"></div>
+                                    <div><label for="dob">Data de nascimento:</label><input type="date" id="dob" name="dob"></div>
+                                    <div><label for="cityState">Cidade/Estado:</label><input type="text" id="cityState" name="cityState"></div>
+                                    <div><label for="profession">Profissão:</label><input type="text" id="profession" name="profession"></div>
+                                </div>
+                            </div>
+                            <div id="form-step-2" class="form-step hidden">
+                                <h3 class="text-xl font-semibold mb-6 border-b pb-2">Seção 2 de 4: Saúde e Corpo</h3>
+                                <div class="space-y-6">
+                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div><label for="weight">Peso atual (kg):</label><input type="number" step="0.1" id="weight" name="weight"></div>
+                                        <div><label for="height">Altura (cm):</label><input type="number" id="height" name="height"></div>
+                                    </div>
+                                    <div><label for="healthConditions">Diagnóstico de alguma condição de saúde?</label><textarea id="healthConditions" name="healthConditions" rows="3"></textarea></div>
+                                    <div><label for="medications">Faz uso de medicamentos contínuos? Quais?</label><textarea id="medications" name="medications" rows="3"></textarea></div>
+                                </div>
+                            </div>
+                            <div id="form-step-3" class="form-step hidden">
+                                <h3 class="text-xl font-semibold mb-6 border-b pb-2">Seção 3 de 4: Alimentação e Hábitos</h3>
+                                <div class="space-y-4">
+                                    <div><label for="mainMeals">Quantas refeições principais por dia?</label><input type="number" id="mainMeals" name="mainMeals"></div>
+                                    <div><label for="foodDiary">Descreva sua alimentação nas últimas 24h.</label><textarea id="foodDiary" name="foodDiary" rows="4"></textarea></div>
+                                    <div><label for="controlFoods">Alimento que sente "não conseguir controlar"?</label><textarea id="controlFoods" name="controlFoods" rows="3"></textarea></div>
+                                </div>
+                            </div>
+                             <div id="form-step-4" class="form-step hidden">
+                                <h3 class="text-xl font-semibold mb-6 border-b pb-2">Seção 4 de 4: Expectativas</h3>
+                                <div class="space-y-4">
+                                    <div><label for="whyNow">Por que você escolheu começar agora?</label><textarea id="whyNow" name="whyNow" rows="3"></textarea></div>
+                                    <div><label for="threeMonthGoal">Maior resultado que gostaria nos próximos 3 meses?</label><textarea id="threeMonthGoal" name="threeMonthGoal" rows="4"></textarea></div>
+                                </div>
+                            </div>
+                        </form>
+                        <div class="flex justify-between mt-8 pt-6 border-t">
+                            <button id="prev-step-btn" class="btn btn-secondary">Anterior</button>
+                            <button id="next-step-btn" class="btn">Próximo</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="scheduler-view" class="hidden">
+                 <div class="bg-white p-6 md:p-8 rounded-lg shadow-md">
+                    <h2 class="text-2xl font-bold text-center mb-6">Selecione o dia e horário da consulta</h2>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div>
+                            <div class="flex items-center justify-between mb-4">
+                                <button id="prev-month" class="p-2 rounded-full hover:bg-gray-100">&lt;</button>
+                                <h3 id="month-year" class="text-xl font-semibold"></h3>
+                                <button id="next-month" class="p-2 rounded-full hover:bg-gray-100">&gt;</button>
+                            </div>
+                            <div id="calendar-grid" class="grid grid-cols-7 gap-1 text-center"></div>
+                        </div>
+                        <div class="flex flex-col">
+                            <h3 class="text-xl font-semibold mb-4 text-center lg:text-left">Horários para <span id="selected-date-span" class="text-indigo-600"></span></h3>
+                            <div id="time-slots" class="grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto max-h-80 no-scrollbar"></div>
+                        </div>
+                    </div>
+                 </div>
+            </div>
+
+            <div id="confirmation-view" class="hidden">
+                <div class="bg-white p-8 rounded-lg shadow-md text-center max-w-2xl mx-auto">
+                    <svg class="w-16 h-16 mx-auto text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <h2 class="text-3xl font-bold mt-4 mb-2">Agendamento Confirmado!</h2>
+                    <p class="text-gray-600 text-lg">Sua consulta foi agendada com sucesso para:</p>
+                    <p id="confirmation-details" class="text-xl font-semibold my-4 bg-indigo-50 p-4 rounded-md text-indigo-700"></p>
+                    <p class="text-gray-500 mt-4">Fique atento(a)! Entraremos em contato de 5 a 10 minutos antes do seu horário agendado para iniciar o atendimento via Google Meet.</p>
+                </div>
+            </div>
+        </main>
+
+        <aside id="admin-view" class="hidden space-y-8">
+            <div class="bg-white p-6 md:p-8 rounded-lg shadow-md">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex items-center gap-4">
+                        <h2 class="text-2xl font-bold">Painel do Administrador</h2>
+                        <button id="add-patient-btn" title="Adicionar Paciente Manualmente" class="bg-indigo-600 hover:bg-indigo-700 text-white w-10 h-10 rounded-full flex items-center justify-center transition-transform transform hover:scale-110 shadow-md">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                        </button>
+                    </div>
+                    <button id="settings-btn" title="Configurações de Horários" class="text-gray-500 hover:text-indigo-600 transition">
+                         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    </button>
+                </div>
+                <div id="birthday-notification-area" class="mb-4"></div>
+                <div id="admin-stats" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+                <div id="next-appointment-info" class="mt-6 text-center text-gray-600 bg-gray-50 p-3 rounded-md"></div>
+            </div>
+            
+            <div class="bg-white p-6 md:p-8 rounded-lg shadow-md">
+                <div class="flex flex-col md:flex-row gap-4 mb-6 justify-between items-center">
+                    <div class="flex-grow flex gap-4">
+                        <div id="scheduled-filters" class="flex-grow flex gap-4">
+                             <input type="text" id="search-input" placeholder="Buscar por nome..." class="flex-grow max-w-xs">
+                             <select id="status-filter">
+                                <option value="all">Todos os Status</option>
+                                <option value="Agendado">Agendado</option>
+                                <option value="Cancelado">Cancelado</option>
+                                <option value="Não Compareceu">Não Compareceu</option>
+                             </select>
+                        </div>
+                        <div id="completed-filters" class="flex-grow hidden">
+                             <input type="text" id="search-completed-input" placeholder="Buscar em realizados..." class="flex-grow max-w-xs">
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button id="print-today-btn" class="btn btn-secondary flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm7-8a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                            Imprimir
+                        </button>
+                        <button id="inactive-report-btn" class="btn btn-secondary flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 5.523-4.477 10-10 10S1 17.523 1 12 5.477 2 11 2s10 4.477 10 10z"></path></svg>
+                            Inativos
+                        </button>
+                        <button id="open-calendar-btn" class="btn btn-secondary flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                            Calendário
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="border-b border-gray-200">
+                    <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                        <button id="tab-scheduled" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-indigo-500 text-indigo-600">
+                            Agendamentos
+                        </button>
+                        <button id="tab-completed" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                            Consultas Realizadas
+                        </button>
+                    </nav>
+                </div>
+
+                <div id="scheduled-appointments-view" class="mt-6">
+                    <div id="scheduled-appointments-counter" class="text-sm text-gray-500 mb-2"></div>
+                    <div id="scheduled-appointments-list" class="space-y-4"></div>
+                </div>
+                <div id="completed-appointments-view" class="mt-6 hidden">
+                    <div id="completed-appointments-counter" class="text-sm text-gray-500 mb-2"></div>
+                    <div id="completed-appointments-list" class="space-y-4"></div>
+                </div>
+
+            </div>
+        </aside>
+        
+        <div id="appointment-modal" class="fixed inset-0 bg-black bg-opacity-60 z-40 flex items-center justify-center p-4 hidden">
+             <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto relative p-6 md:p-8">
+                <button id="close-modal-btn" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                <div id="modal-body">
+                    <h3 class="text-2xl font-bold mb-6">Informações da Pré-Consulta</h3>
+                    <div id="modal-patient-data" class="space-y-4 mb-8"></div>
+                    
+                    <div class="border-t pt-6">
+                         <h3 class="text-xl font-bold mb-4">Detalhes Financeiros</h3>
+                         <div>
+                             <label for="payment-value">Valor Pago (R$):</label>
+                             <input type="number" id="payment-value" step="0.01" class="w-full max-w-xs" placeholder="0.00">
+                             <span id="payment-saved-feedback" class="text-sm text-green-600 hidden ml-2">Salvo!</span>
+                         </div>
+                    </div>
+
+                    <div class="border-t pt-6 mt-6">
+                         <h3 class="text-xl font-bold mb-4">Anotações Confidenciais</h3>
+                         <textarea id="admin-notes" rows="5" class="w-full" placeholder="Digite suas anotações aqui..."></textarea>
+                         <div class="text-right mt-2">
+                            <span id="notes-saved-feedback" class="text-sm text-green-600 hidden">Anotações salvas!</span>
+                         </div>
+                    </div>
+                </div>
+             </div>
+        </div>
+
+        <div id="admin-calendar-modal" class="fixed inset-0 bg-black bg-opacity-60 z-40 flex items-center justify-center p-4 hidden">
+             <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full relative p-6 md:p-8">
+                <button id="close-calendar-modal-btn" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
+                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                <h3 class="text-xl font-bold mb-4">Calendário de Consultas</h3>
+                <div class="flex items-center justify-between mb-4">
+                    <button id="admin-prev-month" class="p-2 rounded-full hover:bg-gray-100 transition-colors">&lt;</button>
+                    <h4 id="admin-month-year" class="text-lg font-semibold"></h4>
+                    <button id="admin-next-month" class="p-2 rounded-full hover:bg-gray-100 transition-colors">&gt;</button>
+                </div>
+                <div id="admin-calendar-grid" class="grid grid-cols-7 gap-1"></div>
+             </div>
+        </div>
+        
+        <div id="daily-appointments-modal" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 hidden">
+             <div class="bg-white rounded-lg shadow-xl max-w-lg w-full relative p-6 md:p-8">
+                <button id="close-daily-modal-btn" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
+                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                <h3 id="daily-modal-title" class="text-2xl font-bold mb-6">Consultas do Dia</h3>
+                <div id="daily-modal-content" class="space-y-3 max-h-[60vh] overflow-y-auto"></div>
+             </div>
+        </div>
+
+        <div id="add-patient-modal" class="fixed inset-0 bg-black bg-opacity-60 z-40 flex items-center justify-center p-4 hidden">
+             <div class="bg-white rounded-lg shadow-xl max-w-lg w-full relative p-6 md:p-8">
+                 <button id="close-add-patient-modal-btn" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
+                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                 </button>
+                 <h3 class="text-2xl font-bold mb-6">Adicionar Novo Agendamento</h3>
+                 <form id="add-patient-form" class="space-y-4">
+                     <div><label for="new-fullName">Nome completo:</label><input type="text" id="new-fullName" required></div>
+                     <div><label for="new-phone">Telefone / WhatsApp:</label><input type="tel" id="new-phone"></div>
+                     <div><label for="new-email">E-mail:</label><input type="email" id="new-email"></div>
+                     <div class="grid grid-cols-2 gap-4">
+                        <div><label for="new-date">Data da consulta:</label><input type="date" id="new-date" required></div>
+                        <div><label for="new-time">Horário:</label><input type="time" id="new-time" required></div>
+                     </div>
+                     <div class="pt-4"><button type="submit" class="btn w-full">Salvar Agendamento</button></div>
+                 </form>
+             </div>
+        </div>
+
+        <div id="settings-modal" class="fixed inset-0 bg-black bg-opacity-60 z-40 flex items-center justify-center p-4 hidden">
+             <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full relative p-6 md:p-8">
+                 <button id="close-settings-modal-btn" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
+                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                 </button>
+                 <h3 class="text-2xl font-bold mb-6">Configurações de Disponibilidade</h3>
+                 <form id="settings-form">
+                    <div id="settings-form-container" class="space-y-4 max-h-[60vh] overflow-y-auto pr-4">
+                        <!-- Gerado dinamicamente -->
+                    </div>
+                     <div class="pt-6 border-t mt-6 flex justify-end items-center gap-4">
+                        <span id="settings-saved-feedback" class="text-sm text-green-600 hidden">Configurações salvas!</span>
+                        <button type="submit" class="btn">Salvar</button>
+                     </div>
+                 </form>
+             </div>
+        </div>
+
+        <div id="inactive-report-modal" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 hidden">
+             <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full relative p-6 md:p-8">
+                <button id="close-inactive-report-modal-btn" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
+                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                <h3 class="text-2xl font-bold mb-6">Relatório de Pacientes Inativos</h3>
+                <div class="flex items-center gap-4 mb-4">
+                    <label for="inactive-days-filter" class="whitespace-nowrap">Mostrar inativos há mais de:</label>
+                    <select id="inactive-days-filter">
+                        <option value="30">30 dias</option>
+                        <option value="60">60 dias</option>
+                        <option value="90" selected>90 dias</option>
+                        <option value="180">180 dias</option>
+                    </select>
+                </div>
+                <div id="inactive-report-content" class="space-y-3 max-h-[60vh] overflow-y-auto"></div>
+             </div>
+        </div>
+
+        <div id="print-area" class="hidden"></div>
+        <div id="history-tooltip" class="tooltip"></div>
+
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, Timestamp, setDoc, getDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        
+        const firebaseConfig = {
+          apiKey: "AIzaSyBaimbuCkshm4GeyzMKeQe4a-TNS1ovYxI",
+          authDomain: "agendamento-d3357.firebaseapp.com",
+          projectId: "agendamento-d3357",
+          storageBucket: "agendamento-d3357.firebasestorage.app",
+          messagingSenderId: "178828469705",
+          appId: "1:178828469705:web:a58a7aabe65264b2f8b418",
+          measurementId: "G-Q6DXTVGKGK"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        async function authenticate() {
+            try {
+                await signInAnonymously(auth);
+            } catch (error) { console.error("Authentication Error:", error); }
+        }
+        
+        // --- Elementos Globais da UI ---
+        const patientFlow = document.getElementById('patient-flow');
+        const adminView = document.getElementById('admin-view');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const adminLoginModal = document.getElementById('admin-login-modal');
+        const adminLoginForm = document.getElementById('admin-login-form');
+
+        // --- Elementos do Fluxo do Paciente ---
+        const consultationTypeSelection = document.getElementById('consultation-type-selection');
+        const firstConsultationBtn = document.getElementById('first-consultation-btn');
+        const returnConsultationBtn = document.getElementById('return-consultation-btn');
+        const returningPatientView = document.getElementById('returning-patient-view');
+        const returningPatientForm = document.getElementById('returning-patient-form');
+        const formView = document.getElementById('form-view');
+        const schedulerView = document.getElementById('scheduler-view');
+        const confirmationView = document.getElementById('confirmation-view');
+        const form = document.getElementById('pre-consultation-form');
+
+        // --- Estado da Aplicação ---
+        let currentUIMode = 'patient';
+        let patientData = {};
+        let allAppointments = [];
+        let currentDate = new Date();
+        let notesTimeout;
+        let paymentTimeout;
+        const TOTAL_STEPS = 4;
+        let currentStep = 1;
+        let activeAdminTab = 'scheduled';
+        let availabilitySettings = {
+            0: { enabled: false, startTime: '09:00', endTime: '18:00' }, // Domingo
+            1: { enabled: true,  startTime: '09:00', endTime: '18:00' }, // Segunda
+            2: { enabled: true,  startTime: '09:00', endTime: '18:00' }, // Terça
+            3: { enabled: true,  startTime: '09:00', endTime: '18:00' }, // Quarta
+            4: { enabled: true,  startTime: '09:00', endTime: '18:00' }, // Quinta
+            5: { enabled: true,  startTime: '09:00', endTime: '18:00' }, // Sexta
+            6: { enabled: false, startTime: '09:00', endTime: '18:00' }, // Sábado
+            breaks: []
+        };
+        
+        function resetPatientFlow() {
+            consultationTypeSelection.classList.remove('hidden');
+            formView.classList.add('hidden');
+            returningPatientView.classList.add('hidden');
+            schedulerView.classList.add('hidden');
+            confirmationView.classList.add('hidden');
+            patientData = {};
+        }
+
+        function requestNotificationPermission() {
+            if (!("Notification" in window)) { return; } 
+            if (Notification.permission === "default") { Notification.requestPermission(); }
+        }
+
+        function showAdminNotification(apt) {
+            if (currentUIMode !== 'admin' || Notification.permission !== "granted" || document.hidden) { return; }
+            const aptDate = apt.appointmentTime.toDate();
+            const notificationTitle = 'Novo Agendamento!';
+            const notificationBody = `${apt.patientInfo.fullName} agendou para ${aptDate.toLocaleDateString('pt-BR')} às ${aptDate.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}.`;
+            new Notification(notificationTitle, { body: notificationBody, icon: 'https://cdn-icons-png.flaticon.com/512/684/684809.png' });
+        }
+
+        function showView(view) {
+            patientFlow.classList.add('hidden');
+            adminView.classList.add('hidden');
+            if (view === 'admin') {
+                adminView.classList.remove('hidden');
+            } else { 
+                patientFlow.classList.remove('hidden');
+                resetPatientFlow();
+            }
+            currentUIMode = view;
+        }
+        
+        adminLoginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (document.getElementById('admin-password').value === "admin") {
+                adminLoginModal.classList.add('hidden');
+                showView('admin');
+                requestNotificationPermission(); 
+                document.getElementById('admin-password').value = '';
+            } else {
+                const errorBox = document.getElementById('error-box');
+                errorBox.classList.remove('hidden');
+                setTimeout(() => errorBox.classList.add('hidden'), 3000);
+            }
+        });
+        
+        // --- LÓGICA FLUXO DO PACIENTE ---
+        firstConsultationBtn.addEventListener('click', () => {
+            consultationTypeSelection.classList.add('hidden');
+            formView.classList.remove('hidden');
+            showFormStep(1);
+        });
+        returnConsultationBtn.addEventListener('click', () => {
+            consultationTypeSelection.classList.add('hidden');
+            returningPatientView.classList.remove('hidden');
+        });
+        returningPatientForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            patientData = {
+                fullName: document.getElementById('return-fullName').value,
+                phone: document.getElementById('return-phone').value,
+                isReturning: true
+            };
+            returningPatientView.classList.add('hidden');
+            schedulerView.classList.remove('hidden');
+            renderCalendar();
+            selectDate(new Date());
+        });
+
+        const prevStepBtn = document.getElementById('prev-step-btn');
+        const nextStepBtn = document.getElementById('next-step-btn');
+
+        function showFormStep(step) {
+            currentStep = step;
+            document.querySelectorAll('.form-step').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`form-step-${step}`).classList.remove('hidden');
+            
+            const progress = (step / TOTAL_STEPS) * 100;
+            document.getElementById('progress-bar').style.width = `${progress}%`;
+            document.getElementById('progress-text').textContent = `${step} de ${TOTAL_STEPS}`;
+
+            document.querySelectorAll('.step-indicator').forEach(ind => {
+                ind.classList.remove('active');
+                if (ind.dataset.step == step) {
+                    ind.classList.add('active');
+                }
+            });
+            
+            prevStepBtn.style.visibility = step === 1 ? 'hidden' : 'visible';
+            nextStepBtn.textContent = step === TOTAL_STEPS ? 'Ir para Agendamento' : 'Próximo';
+        }
+
+        nextStepBtn.addEventListener('click', () => {
+            if (currentStep < TOTAL_STEPS) {
+                showFormStep(currentStep + 1);
+            } else {
+                const formData = new FormData(form);
+                patientData = Object.fromEntries(formData.entries());
+                patientData.isReturning = false;
+                formView.classList.add('hidden');
+                schedulerView.classList.remove('hidden');
+                renderCalendar();
+                selectDate(new Date());
+            }
+        });
+        prevStepBtn.addEventListener('click', () => { if (currentStep > 1) showFormStep(currentStep - 1); });
+        document.querySelectorAll('.step-indicator').forEach(btn => {
+            btn.addEventListener('click', () => showFormStep(parseInt(btn.dataset.step)));
+        });
+
+        const calendarGrid = document.getElementById('calendar-grid');
+        const monthYearEl = document.getElementById('month-year');
+        const selectedDateSpan = document.getElementById('selected-date-span');
+        const timeSlotsContainer = document.getElementById('time-slots');
+        
+        function renderCalendar() {
+            calendarGrid.innerHTML = `<div class="font-semibold text-xs text-gray-500">DOM</div><div class="font-semibold text-xs text-gray-500">SEG</div><div class="font-semibold text-xs text-gray-500">TER</div><div class="font-semibold text-xs text-gray-500">QUA</div><div class="font-semibold text-xs text-gray-500">QUI</div><div class="font-semibold text-xs text-gray-500">SEX</div><div class="font-semibold text-xs text-gray-500">SÁB</div>`;
+            const month = currentDate.getMonth();
+            const year = currentDate.getFullYear();
+            monthYearEl.textContent = `${currentDate.toLocaleString('pt-BR', { month: 'long' })} ${year}`;
+            const firstDayOfMonth = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            for (let i = 0; i < firstDayOfMonth; i++) { calendarGrid.insertAdjacentHTML('beforeend', '<div></div>'); }
+            for (let i = 1; i <= daysInMonth; i++) {
+                const dayDate = new Date(year, month, i); dayDate.setHours(0,0,0,0);
+                const dayEl = document.createElement('button');
+                dayEl.textContent = i;
+                dayEl.classList.add('p-2', 'rounded-full', 'w-10', 'h-10', 'mx-auto', 'flex', 'items-center', 'justify-center', 'transition');
+                
+                const dayOfWeek = dayDate.getDay();
+                const isWorkDay = availabilitySettings[dayOfWeek]?.enabled;
+
+                if (dayDate < today || !isWorkDay) {
+                    dayEl.disabled = true; dayEl.classList.add('text-gray-400', 'cursor-not-allowed', 'line-through');
+                } else {
+                    dayEl.classList.add('hover:bg-indigo-100'); dayEl.addEventListener('click', () => selectDate(dayDate));
+                }
+                if(dayDate.getTime() === today.getTime() && isWorkDay){ dayEl.classList.add('bg-indigo-200', 'text-indigo-800'); }
+                calendarGrid.appendChild(dayEl);
+            }
+        }
+        function selectDate(date) {
+            selectedDateSpan.textContent = date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' });
+            document.querySelectorAll('#calendar-grid button').forEach(btn => {
+                btn.classList.remove('bg-indigo-600', 'text-white');
+                const day = parseInt(btn.textContent);
+                if (day === date.getDate() && currentDate.getMonth() === date.getMonth()) {
+                     btn.classList.add('bg-indigo-600', 'text-white');
+                }
+            });
+            renderTimeSlots(date);
+        }
+        function renderTimeSlots(date) {
+            timeSlotsContainer.innerHTML = '';
+            const dayOfWeek = date.getDay();
+            const daySettings = availabilitySettings[dayOfWeek];
+
+            if (!daySettings || !daySettings.enabled) {
+                timeSlotsContainer.innerHTML = '<p class="col-span-full text-center text-gray-500">Não há atendimento neste dia.</p>';
+                return;
+            }
+
+            const [startHour, startMinute] = daySettings.startTime.split(':').map(Number);
+            const [endHour, endMinute] = daySettings.endTime.split(':').map(Number);
+
+            const bookedSlots = allAppointments.filter(apt => { const aptDate = apt.appointmentTime.toDate(); return aptDate.getFullYear() === date.getFullYear() && aptDate.getMonth() === date.getMonth() && aptDate.getDate() === date.getDate(); }).map(apt => { const aptDate = apt.appointmentTime.toDate(); return `${String(aptDate.getHours()).padStart(2, '0')}:${String(aptDate.getMinutes()).padStart(2, '0')}`; });
+            
+            let currentTime = new Date(date);
+            currentTime.setHours(startHour, startMinute, 0, 0);
+
+            let endTimeDate = new Date(date);
+            endTimeDate.setHours(endHour, endMinute, 0, 0);
+
+            while(currentTime < endTimeDate) {
+                const slotHour = currentTime.getHours();
+                const slotMinute = currentTime.getMinutes();
+                const timeString = `${String(slotHour).padStart(2, '0')}:${String(slotMinute).padStart(2, '0')}`;
+                
+                const now = new Date();
+                const slotStart = new Date(date);
+                slotStart.setHours(slotHour, slotMinute, 0, 0);
+
+                const isBlocked = (availabilitySettings.breaks || []).some(breakItem => {
+                    const breakStart = new Date(date);
+                    const [bsH, bsM] = breakItem.start.split(':').map(Number);
+                    breakStart.setHours(bsH, bsM, 0, 0);
+
+                    const breakEnd = new Date(date);
+                    const [beH, beM] = breakItem.end.split(':').map(Number);
+                    breakEnd.setHours(beH, beM, 0, 0);
+
+                    return slotStart >= breakStart && slotStart < breakEnd;
+                });
+
+                if (slotStart > now && !isBlocked) {
+                    const slotEl = document.createElement('button');
+                    slotEl.textContent = timeString;
+                    slotEl.classList.add('p-2', 'border', 'rounded-md', 'text-center', 'transition');
+                    
+                    if(bookedSlots.includes(timeString)){
+                        slotEl.disabled = true;
+                        slotEl.classList.add('bg-gray-200', 'text-gray-500', 'cursor-not-allowed', 'line-through');
+                    } else {
+                        slotEl.classList.add('border-indigo-500', 'text-indigo-600', 'hover:bg-indigo-500', 'hover:text-white');
+                        slotEl.onclick = () => confirmAppointment(date, slotHour, slotMinute);
+                    }
+                    timeSlotsContainer.appendChild(slotEl);
+                }
+                
+                currentTime.setMinutes(currentTime.getMinutes() + 40);
+            }
+
+            if(timeSlotsContainer.innerHTML === ''){ timeSlotsContainer.innerHTML = '<p class="col-span-full text-center text-gray-500">Não há horários disponíveis para este dia.</p>'; }
+        }
+        async function confirmAppointment(date, hour, minute) {
+            loadingOverlay.classList.remove('hidden');
+            const appointmentTime = new Date(date); appointmentTime.setHours(hour, minute, 0, 0);
+            try {
+                await addDoc(collection(db, `consultations`), { patientInfo: patientData, appointmentTime: Timestamp.fromDate(appointmentTime), createdAt: Timestamp.now(), status: 'Agendado', adminNotes: '' });
+                document.getElementById('confirmation-details').textContent = `${appointmentTime.toLocaleDateString('pt-BR')} às ${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
+                schedulerView.classList.add('hidden');
+                confirmationView.classList.remove('hidden');
+            } catch(error) { console.error("Scheduling Error:", error); } 
+            finally { loadingOverlay.classList.add('hidden'); }
+        }
+        document.getElementById('prev-month').addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() - 1); renderCalendar(); });
+        document.getElementById('next-month').addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() + 1); renderCalendar(); });
+        
+        const adminStatsContainer = document.getElementById('admin-stats');
+        const nextAppointmentInfo = document.getElementById('next-appointment-info');
+        const searchInput = document.getElementById('search-input');
+        const searchCompletedInput = document.getElementById('search-completed-input');
+        const statusFilter = document.getElementById('status-filter');
+        const scheduledFilters = document.getElementById('scheduled-filters');
+        const completedFilters = document.getElementById('completed-filters');
+        const modal = document.getElementById('appointment-modal');
+        const modalPatientData = document.getElementById('modal-patient-data');
+        const adminNotesTextarea = document.getElementById('admin-notes');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        
+        const adminCalendarModal = document.getElementById('admin-calendar-modal');
+        const openCalendarBtn = document.getElementById('open-calendar-btn');
+        const closeCalendarModalBtn = document.getElementById('close-calendar-modal-btn');
+        const adminCalendarGrid = document.getElementById('admin-calendar-grid');
+        const adminMonthYear = document.getElementById('admin-month-year');
+        const adminPrevMonthBtn = document.getElementById('admin-prev-month');
+        const adminNextMonthBtn = document.getElementById('admin-next-month');
+
+        const dailyAppointmentsModal = document.getElementById('daily-appointments-modal');
+        const closeDailyModalBtn = document.getElementById('close-daily-modal-btn');
+
+        const tabScheduledBtn = document.getElementById('tab-scheduled');
+        const tabCompletedBtn = document.getElementById('tab-completed');
+        const scheduledAppointmentsView = document.getElementById('scheduled-appointments-view');
+        const completedAppointmentsView = document.getElementById('completed-appointments-view');
+        const scheduledAppointmentsCounter = document.getElementById('scheduled-appointments-counter');
+        const completedAppointmentsCounter = document.getElementById('completed-appointments-counter');
+
+        const addPatientBtn = document.getElementById('add-patient-btn');
+        const addPatientModal = document.getElementById('add-patient-modal');
+        const addPatientForm = document.getElementById('add-patient-form');
+        const closeAddPatientModalBtn = document.getElementById('close-add-patient-modal-btn');
+
+        const settingsBtn = document.getElementById('settings-btn');
+        const settingsModal = document.getElementById('settings-modal');
+        const closeSettingsModalBtn = document.getElementById('close-settings-modal-btn');
+        const settingsForm = document.getElementById('settings-form');
+        const settingsFormContainer = document.getElementById('settings-form-container');
+
+        const inactiveReportBtn = document.getElementById('inactive-report-btn');
+        const inactiveReportModal = document.getElementById('inactive-report-modal');
+        const closeInactiveReportModalBtn = document.getElementById('close-inactive-report-modal-btn');
+        const inactiveDaysFilter = document.getElementById('inactive-days-filter');
+
+        const printTodayBtn = document.getElementById('print-today-btn');
+        const birthdayNotificationArea = document.getElementById('birthday-notification-area');
+        const historyTooltip = document.getElementById('history-tooltip');
+
+
+        let adminCalendarDate = new Date();
+        
+        openCalendarBtn.addEventListener('click', () => adminCalendarModal.classList.remove('hidden'));
+        closeCalendarModalBtn.addEventListener('click', () => adminCalendarModal.classList.add('hidden'));
+        adminCalendarModal.addEventListener('click', (e) => { if(e.target === adminCalendarModal) adminCalendarModal.classList.add('hidden'); });
+
+        closeDailyModalBtn.addEventListener('click', () => dailyAppointmentsModal.classList.add('hidden'));
+        dailyAppointmentsModal.addEventListener('click', (e) => { if(e.target === dailyAppointmentsModal) dailyAppointmentsModal.classList.add('hidden'); });
+
+        addPatientBtn.addEventListener('click', () => addPatientModal.classList.remove('hidden'));
+        closeAddPatientModalBtn.addEventListener('click', () => addPatientModal.classList.add('hidden'));
+        addPatientModal.addEventListener('click', (e) => { if(e.target === addPatientModal) addPatientModal.classList.add('hidden'); });
+
+        settingsBtn.addEventListener('click', () => settingsModal.classList.remove('hidden'));
+        closeSettingsModalBtn.addEventListener('click', () => settingsModal.classList.add('hidden'));
+        settingsModal.addEventListener('click', (e) => { if(e.target === settingsModal) settingsModal.classList.add('hidden'); });
+
+        inactiveReportBtn.addEventListener('click', () => {
+            inactiveReportModal.classList.remove('hidden');
+            generateInactivePatientReport();
+        });
+        closeInactiveReportModalBtn.addEventListener('click', () => inactiveReportModal.classList.add('hidden'));
+        inactiveReportModal.addEventListener('click', (e) => { if (e.target === inactiveReportModal) inactiveReportModal.classList.add('hidden'); });
+        inactiveDaysFilter.addEventListener('change', generateInactivePatientReport);
+        printTodayBtn.addEventListener('click', printDailyAgenda);
+
+        adminPrevMonthBtn.addEventListener('click', () => {
+            adminCalendarDate.setMonth(adminCalendarDate.getMonth() - 1);
+            renderAdminCalendar();
+        });
+        adminNextMonthBtn.addEventListener('click', () => {
+            adminCalendarDate.setMonth(adminCalendarDate.getMonth() + 1);
+            renderAdminCalendar();
+        });
+
+        searchInput.addEventListener('input', filterAndRenderAppointments);
+        searchCompletedInput.addEventListener('input', filterAndRenderAppointments);
+        statusFilter.addEventListener('change', filterAndRenderAppointments);
+        closeModalBtn.addEventListener('click', () => modal.classList.add('hidden'));
+        modal.addEventListener('click', (e) => { if(e.target === modal) modal.classList.add('hidden'); });
+
+        tabScheduledBtn.addEventListener('click', () => {
+            activeAdminTab = 'scheduled';
+            tabScheduledBtn.classList.add('border-indigo-500', 'text-indigo-600');
+            tabScheduledBtn.classList.remove('border-transparent', 'text-gray-500');
+            tabCompletedBtn.classList.add('border-transparent', 'text-gray-500');
+            tabCompletedBtn.classList.remove('border-indigo-500', 'text-indigo-600');
+            
+            scheduledAppointmentsView.classList.remove('hidden');
+            completedAppointmentsView.classList.add('hidden');
+            scheduledFilters.classList.remove('hidden');
+            completedFilters.classList.add('hidden');
+            
+            filterAndRenderAppointments();
+        });
+
+        tabCompletedBtn.addEventListener('click', () => {
+            activeAdminTab = 'completed';
+            tabCompletedBtn.classList.add('border-indigo-500', 'text-indigo-600');
+            tabCompletedBtn.classList.remove('border-transparent', 'text-gray-500');
+            tabScheduledBtn.classList.add('border-transparent', 'text-gray-500');
+            tabScheduledBtn.classList.remove('border-indigo-500', 'text-indigo-600');
+            
+            scheduledAppointmentsView.classList.add('hidden');
+            completedAppointmentsView.classList.remove('hidden');
+            scheduledFilters.classList.add('hidden');
+            completedFilters.classList.remove('hidden');
+            
+            filterAndRenderAppointments();
+        });
+
+        addPatientForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            loadingOverlay.classList.remove('hidden');
+
+            const fullName = document.getElementById('new-fullName').value;
+            const phone = document.getElementById('new-phone').value;
+            const email = document.getElementById('new-email').value;
+            const date = document.getElementById('new-date').value;
+            const time = document.getElementById('new-time').value;
+
+            const [year, month, day] = date.split('-');
+            const [hour, minute] = time.split(':');
+            const appointmentTime = new Date(year, month - 1, day, hour, minute);
+
+            const newAppointmentData = {
+                patientInfo: { fullName, phone, email },
+                appointmentTime: Timestamp.fromDate(appointmentTime),
+                createdAt: Timestamp.now(),
+                status: 'Agendado',
+                adminNotes: 'Agendado manualmente.',
+                paymentValue: ''
+            };
+
+            try {
+                await addDoc(collection(db, `consultations`), newAppointmentData);
+                addPatientForm.reset();
+                addPatientModal.classList.add('hidden');
+            } catch (error) {
+                console.error("Erro ao adicionar agendamento manual:", error);
+                alert("Não foi possível salvar o agendamento.");
+            } finally {
+                loadingOverlay.classList.add('hidden');
+            }
+        });
+        
+        settingsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newSettings = { breaks: [] };
+            
+            document.querySelectorAll('.day-setting-container').forEach(container => {
+                const dayIndex = container.dataset.day;
+                const isEnabled = container.querySelector('input[type="checkbox"]').checked;
+                const startTime = container.querySelector(`input[id^="start-time"]`).value;
+                const endTime = container.querySelector(`input[id^="end-time"]`).value;
+                newSettings[dayIndex] = { enabled: isEnabled, startTime, endTime };
+            });
+
+            document.querySelectorAll('.break-item').forEach(item => {
+                const start = item.dataset.start;
+                const end = item.dataset.end;
+                newSettings.breaks.push({ start, end });
+            });
+
+            try {
+                const settingsRef = doc(db, `settings/availability`);
+                await setDoc(settingsRef, newSettings);
+                availabilitySettings = newSettings;
+                const feedback = document.getElementById('settings-saved-feedback');
+                feedback.classList.remove('hidden');
+                setTimeout(() => feedback.classList.add('hidden'), 2000);
+            } catch (error) {
+                console.error("Erro ao salvar configurações:", error);
+                alert("Não foi possível salvar as configurações.");
+            }
+        });
+        
+        function renderBreaksList() {
+            const breaksListContainer = document.getElementById('breaks-list');
+            breaksListContainer.innerHTML = '';
+            if (availabilitySettings.breaks) {
+                availabilitySettings.breaks.forEach((breakItem, index) => {
+                    const breakEl = document.createElement('div');
+                    breakEl.className = 'break-item flex items-center justify-between bg-gray-100 p-2 rounded';
+                    breakEl.dataset.start = breakItem.start;
+                    breakEl.dataset.end = breakItem.end;
+                    breakEl.innerHTML = `<span>${breakItem.start} - ${breakItem.end}</span><button type="button" class="text-red-500 hover:text-red-700 remove-break-btn">&times;</button>`;
+                    breaksListContainer.appendChild(breakEl);
+                });
+                document.querySelectorAll('.remove-break-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const item = e.target.closest('.break-item');
+                        const start = item.dataset.start;
+                        const end = item.dataset.end;
+                        availabilitySettings.breaks = availabilitySettings.breaks.filter(b => b.start !== start || b.end !== end);
+                        renderBreaksList();
+                    });
+                });
+            }
+        }
+        
+        function setupSettingsModal() {
+            const daysOfWeek = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+            let settingsHTML = '';
+            daysOfWeek.forEach((day, index) => {
+                settingsHTML += `
+                    <div class="day-setting-container p-4 border rounded-lg" data-day="${index}">
+                        <label class="flex items-center space-x-3 font-semibold cursor-pointer">
+                            <input type="checkbox" name="work-day-enabled" class="h-5 w-5 rounded text-indigo-600 focus:ring-indigo-500">
+                            <span>${day}</span>
+                        </label>
+                        <div class="grid grid-cols-2 gap-4 mt-2 pl-8">
+                            <div>
+                                <label for="start-time-${index}" class="text-sm">Início:</label>
+                                <input type="time" id="start-time-${index}" disabled>
+                            </div>
+                            <div>
+                                <label for="end-time-${index}" class="text-sm">Fim:</label>
+                                <input type="time" id="end-time-${index}" disabled>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+            settingsHTML += `
+                <div class="border-t pt-4 mt-4">
+                    <h4 class="font-semibold mb-2">Bloqueios de Horário (Pausas)</h4>
+                    <div id="breaks-list" class="space-y-2 mb-4"></div>
+                    <div class="flex items-center gap-2">
+                        <input type="time" id="break-start-time" class="w-full">
+                        <span>até</span>
+                        <input type="time" id="break-end-time" class="w-full">
+                        <button type="button" id="add-break-btn" class="btn whitespace-nowrap">Adicionar</button>
+                    </div>
+                </div>
+            `;
+            settingsFormContainer.innerHTML = settingsHTML;
+
+            document.querySelectorAll('.day-setting-container input[type="checkbox"]').forEach(checkbox => {
+                checkbox.addEventListener('change', (e) => {
+                    const container = e.target.closest('.day-setting-container');
+                    const timeInputs = container.querySelectorAll('input[type="time"]');
+                    timeInputs.forEach(input => input.disabled = !e.target.checked);
+                });
+            });
+
+            document.getElementById('add-break-btn').addEventListener('click', () => {
+                const start = document.getElementById('break-start-time').value;
+                const end = document.getElementById('break-end-time').value;
+                if(start && end && start < end) {
+                    if (!availabilitySettings.breaks) availabilitySettings.breaks = [];
+                    availabilitySettings.breaks.push({ start, end });
+                    renderBreaksList();
+                    document.getElementById('break-start-time').value = '';
+                    document.getElementById('break-end-time').value = '';
+                }
+            });
+        }
+
+        const getStatusPill = (status) => {
+            const styles = { 'Agendado': 'bg-blue-100 text-blue-800', 'Realizado': 'bg-green-100 text-green-800', 'Cancelado': 'bg-red-100 text-red-800', 'Não Compareceu': 'bg-yellow-100 text-yellow-800' };
+            return styles[status] || 'bg-gray-100 text-gray-800';
+        }
+
+        function filterAndRenderAppointments() {
+            let allScheduledApts = allAppointments.filter(a => a.status !== 'Realizado');
+            let allCompletedApts = allAppointments.filter(a => a.status === 'Realizado');
+            
+            const searchTermScheduled = searchInput.value.toLowerCase();
+            const status = statusFilter.value;
+            let filteredScheduled = allScheduledApts.filter(apt => (apt.patientInfo.fullName?.toLowerCase().includes(searchTermScheduled) ?? true));
+            if(status !== 'all') {
+                filteredScheduled = filteredScheduled.filter(apt => apt.status === status);
+            }
+             
+            const searchTermCompleted = searchCompletedInput.value.toLowerCase();
+            let filteredCompleted = allCompletedApts.filter(apt => (apt.patientInfo.fullName?.toLowerCase().includes(searchTermCompleted) ?? true));
+
+            renderAdminDashboard();
+            renderAdminCalendar();
+            renderAppointmentsList(filteredScheduled, 'scheduled-appointments-list', allScheduledApts.length);
+            renderAppointmentsList(filteredCompleted, 'completed-appointments-list', allCompletedApts.length);
+        }
+
+        function generateInactivePatientReport() {
+            const inactiveDays = parseInt(inactiveDaysFilter.value);
+            const thresholdDate = new Date();
+            thresholdDate.setDate(thresholdDate.getDate() - inactiveDays);
+
+            const realizedAppointments = allAppointments.filter(apt => apt.status === 'Realizado');
+            const latestAppointments = new Map();
+
+            realizedAppointments.forEach(apt => {
+                const name = apt.patientInfo.fullName;
+                if (!latestAppointments.has(name) || apt.appointmentTime.toMillis() > latestAppointments.get(name).appointmentTime.toMillis()) {
+                    latestAppointments.set(name, apt);
+                }
+            });
+
+            const inactivePatients = Array.from(latestAppointments.values()).filter(apt => apt.appointmentTime.toDate() < thresholdDate);
+            
+            const reportContent = document.getElementById('inactive-report-content');
+            reportContent.innerHTML = '';
+
+            if (inactivePatients.length === 0) {
+                reportContent.innerHTML = '<p class="text-gray-500">Nenhum paciente inativo encontrado.</p>';
+                return;
+            }
+
+            inactivePatients.forEach(apt => {
+                const aptDate = apt.appointmentTime.toDate();
+                const phone = apt.patientInfo.phone?.replace(/\D/g, '');
+                const reportEl = document.createElement('div');
+                reportEl.className = 'p-3 bg-gray-50 rounded-md border flex justify-between items-center';
+                reportEl.innerHTML = `
+                    <div>
+                        <p class="font-semibold">${apt.patientInfo.fullName}</p>
+                        <p class="text-sm text-gray-600">Última consulta: ${aptDate.toLocaleDateString('pt-BR')}</p>
+                    </div>
+                    <a href="https://wa.me/55${phone || ''}" target="_blank" class="btn btn-secondary text-sm py-1 px-3 ${!phone ? 'opacity-50 cursor-not-allowed' : ''}">Contato</a>
+                `;
+                reportContent.appendChild(reportEl);
+            });
+        }
+        
+        function showDailyAppointmentsModal(date) {
+            const appointmentsForDay = allAppointments
+                .filter(apt => apt.appointmentTime.toDate().toDateString() === date.toDateString())
+                .sort((a,b) => a.appointmentTime.toMillis() - b.appointmentTime.toMillis());
+            
+            const modalTitle = document.getElementById('daily-modal-title');
+            const modalContent = document.getElementById('daily-modal-content');
+            
+            modalTitle.textContent = `Consultas de ${date.toLocaleDateString('pt-BR', {weekday: 'long', day: '2-digit', month: 'long'})}`;
+
+            if (appointmentsForDay.length === 0) {
+                modalContent.innerHTML = `<p class="text-gray-500">Nenhuma consulta para este dia.</p>`;
+            } else {
+                modalContent.innerHTML = appointmentsForDay.map(apt => {
+                    const aptDate = apt.appointmentTime.toDate();
+                    return `
+                        <div class="p-3 bg-gray-50 rounded-md border">
+                            <p class="font-semibold">${apt.patientInfo.fullName}</p>
+                            <p class="text-sm text-gray-600">${aptDate.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}</p>
+                        </div>
+                    `;
+                }).join('');
+            }
+            
+            dailyAppointmentsModal.classList.remove('hidden');
+        }
+
+        function renderAdminCalendar() {
+            adminCalendarGrid.innerHTML = `<div class="font-semibold text-xs text-gray-500 py-2">DOM</div><div class="font-semibold text-xs text-gray-500 py-2">SEG</div><div class="font-semibold text-xs text-gray-500 py-2">TER</div><div class="font-semibold text-xs text-gray-500 py-2">QUA</div><div class="font-semibold text-xs text-gray-500 py-2">QUI</div><div class="font-semibold text-xs text-gray-500 py-2">SEX</div><div class="font-semibold text-xs text-gray-500 py-2">SÁB</div>`;
+            const month = adminCalendarDate.getMonth();
+            const year = adminCalendarDate.getFullYear();
+            adminMonthYear.textContent = `${adminCalendarDate.toLocaleString('pt-BR', { month: 'long' })} ${year}`;
+            const firstDayOfMonth = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            for (let i = 0; i < firstDayOfMonth; i++) { adminCalendarGrid.insertAdjacentHTML('beforeend', '<div></div>'); }
+            for (let i = 1; i <= daysInMonth; i++) {
+                const dayDate = new Date(year, month, i); dayDate.setHours(0,0,0,0);
+                const dayDateStr = dayDate.toISOString().split('T')[0];
+                const appointmentsForDay = allAppointments.filter(apt => apt.appointmentTime.toDate().toISOString().split('T')[0] === dayDateStr);
+                const dayEl = document.createElement('div');
+                dayEl.className = 'border rounded-lg p-2 h-24 flex flex-col items-start transition-colors';
+                let appointmentsHtml = '';
+                if (appointmentsForDay.length > 0) {
+                    dayEl.classList.add('bg-indigo-50', 'cursor-pointer', 'hover:bg-indigo-100');
+                    appointmentsHtml = `<div class="mt-1 text-xs text-left w-full"><p class="font-bold text-indigo-700">${appointmentsForDay.length} consulta(s)</p></div>`;
+                    dayEl.addEventListener('click', () => showDailyAppointmentsModal(dayDate));
+                }
+                dayEl.innerHTML = `<span class="font-semibold self-center">${i}</span>${appointmentsHtml}`;
+                adminCalendarGrid.appendChild(dayEl);
+            }
+        }
+
+        function renderAppointmentsList(apts, containerId, totalCount) {
+            const container = document.getElementById(containerId);
+            const counterEl = document.getElementById(containerId.replace('list', 'counter'));
+            container.innerHTML = '';
+            
+            if (totalCount > 0) {
+                counterEl.textContent = `Mostrando ${apts.length} de ${totalCount} agendamentos.`;
+            } else {
+                 counterEl.textContent = '';
+            }
+
+            if (apts.length === 0) {
+                container.innerHTML = `<div class="text-center text-gray-500 py-12"><svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" /></svg><h3 class="mt-2 text-sm font-medium text-gray-900">Sem agendamentos</h3><p class="mt-1 text-sm text-gray-500">Nenhum agendamento encontrado para os filtros atuais.</p></div>`;
+                return;
+            }
+
+            const sorted = [...apts].sort((a, b) => b.appointmentTime.toMillis() - a.appointmentTime.toMillis());
+            sorted.forEach(apt => {
+                const aptDate = apt.appointmentTime.toDate();
+                const isPast = aptDate < new Date();
+                const phone = apt.patientInfo.phone?.replace(/\D/g, '');
+                const aptEl = document.createElement('div');
+                aptEl.className = `bg-white border border-gray-200 rounded-lg p-4 shadow-sm transition-all hover:shadow-md flex flex-col md:flex-row md:items-center md:justify-between gap-4 ${isPast && apt.status !== 'Agendado' ? 'opacity-70' : ''}`;
+                
+                let statusSelectHTML = `
+                   <select data-id="${apt.id}" class="status-select text-xs font-bold rounded-full px-3 py-2 uppercase tracking-wider border-none w-full md:w-auto ${getStatusPill(apt.status)}">
+                        <option value="Agendado" ${apt.status === 'Agendado' ? 'selected' : ''}>Agendado</option>
+                        <option value="Realizado" ${apt.status === 'Realizado' ? 'selected' : ''}>Realizado</option>
+                        <option value="Cancelado" ${apt.status === 'Cancelado' ? 'selected' : ''}>Cancelado</option>
+                        <option value="Não Compareceu" ${apt.status === 'Não Compareceu' ? 'selected' : ''}>Não Compareceu</option>
+                   </select>`;
+
+                let paymentHTML = '';
+                if (apt.status === 'Realizado') {
+                    statusSelectHTML = `<span class="text-xs font-bold rounded-full px-3 py-2 uppercase tracking-wider ${getStatusPill(apt.status)}">Realizado</span>`;
+                    const paymentValue = apt.paymentValue ? parseFloat(apt.paymentValue).toFixed(2).replace('.', ',') : '0,00';
+                    paymentHTML = `<span class="flex items-center gap-1.5 text-green-700"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>R$ ${paymentValue}</span>`;
+                }
+
+                const typeTag = apt.patientInfo.isReturning 
+                    ? `<span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800">Retorno</span>` 
+                    : `<span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800">1ª Consulta</span>`;
+
+                aptEl.innerHTML = `
+                    <div class="flex-grow">
+                        <div class="flex items-center gap-3">
+                           <p class="font-bold text-lg text-gray-800 patient-name" data-patient-name="${apt.patientInfo.fullName}">${apt.patientInfo.fullName || 'Paciente não informado'}</p>
+                           ${typeTag}
+                        </div>
+                        <div class="flex flex-wrap items-center text-gray-500 mt-2 text-sm gap-x-4 gap-y-1">
+                            <span class="flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>${aptDate.toLocaleDateString('pt-BR')}</span>
+                            <span class="flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>${aptDate.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}</span>
+                            ${paymentHTML}
+                        </div>
+                    </div>
+                    <div class="flex flex-col md:flex-row md:items-center gap-3 w-full md:w-auto">
+                       ${statusSelectHTML}
+                       <a href="https://wa.me/55${phone || ''}" target="_blank" class="flex items-center justify-center gap-2 text-sm font-semibold text-white bg-green-500 hover:bg-green-600 px-4 py-2 rounded-md transition whitespace-nowrap shadow hover:shadow-lg transform hover:scale-105 ${!phone ? 'opacity-50 cursor-not-allowed' : ''}">
+                         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.06 22L7.31 20.62C8.75 21.41 10.36 21.82 12.04 21.82C17.5 21.82 21.95 17.37 21.95 11.91C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2M12.04 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.71 20.28 11.91C20.28 16.47 16.65 20.1 12.04 20.1C10.5 20.1 9.03 19.68 7.78 18.93L7.4 18.7L3.92 19.62L4.85 16.23L4.64 15.82C3.82 14.48 3.4 12.97 3.4 11.91C3.4 7.35 7.03 3.67 12.04 3.67M9.13 7.59C8.93 7.59 8.76 7.63 8.6 7.87C8.44 8.12 7.81 8.79 7.81 9.91C7.81 11.04 8.63 12.11 8.76 12.27C8.89 12.44 11.04 15.93 14.41 17.42C17.22 18.66 17.22 18.23 17.81 18.17C18.41 18.11 19.5 17.5 19.74 16.88C19.99 16.26 19.99 15.76 19.86 15.6C19.74 15.44 19.58 15.38 19.32 15.25C19.07 15.12 17.72 14.48 17.48 14.38C17.23 14.28 17.07 14.25 16.91 14.5C16.75 14.75 16.23 15.38 16.07 15.54C15.91 15.71 15.75 15.73 15.44 15.6C15.14 15.47 14.07 15.11 12.78 13.91C11.78 12.98 11.13 11.85 10.93 11.56C10.73 11.27 10.86 11.13 11 10.97C11.13 10.83 11.28 10.65 11.41 10.5C11.54 10.35 11.59 10.23 11.69 10.03C11.79 9.83 11.72 9.64 11.66 9.5C11.59 9.37 11.08 8.12 10.84 7.59C10.62 7.09 10.38 7.15 10.21 7.15H10.1A1.47 1.47 0 0 0 9.13 7.59Z"></path></svg>
+                       </a>
+                       <button data-id="${apt.id}" class="view-details-btn bg-indigo-600 text-white px-4 py-2 rounded-md font-semibold hover:bg-indigo-700 transition text-sm w-full md:w-auto whitespace-nowrap">Ver Informações</button>
+                    </div>
+                `;
+                container.appendChild(aptEl);
+            });
+
+            document.querySelectorAll(`#${containerId} .view-details-btn`).forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const aptId = btn.getAttribute('data-id');
+                    const selectedApt = allAppointments.find(a => a.id === aptId);
+                    if (selectedApt) showAppointmentDetails(selectedApt);
+                });
+            });
+
+            document.querySelectorAll(`#${containerId} .status-select`).forEach(select => {
+                select.addEventListener('change', async (e) => {
+                    const aptId = e.target.getAttribute('data-id');
+                    const newStatus = e.target.value;
+                    e.target.className = `status-select text-xs font-bold rounded-full px-3 py-2 uppercase tracking-wider border-none w-full md:w-auto ${getStatusPill(newStatus)}`;
+                    await updateDoc(doc(db, `consultations`, aptId), { status: newStatus });
+                });
+            });
+        }
+
+        function renderAdminDashboard() {
+            const upcomingStatuses = ['Agendado'];
+            const upcomingAppointments = allAppointments.filter(apt => apt.appointmentTime.toDate() > new Date() && upcomingStatuses.includes(apt.status));
+            const pastAppointments = allAppointments.filter(apt => apt.status === 'Realizado');
+
+            const billingPeriodFilter = document.createElement('select');
+            billingPeriodFilter.id = 'billing-period-filter';
+            billingPeriodFilter.className = 'text-sm rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500';
+            billingPeriodFilter.innerHTML = `<option value="month">Este Mês</option><option value="week">Esta Semana</option><option value="all">Desde o início</option>`;
+            billingPeriodFilter.onchange = renderAdminDashboard;
+
+            const now = new Date();
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const startOfWeek = new Date(now);
+            startOfWeek.setDate(now.getDate() - now.getDay());
+            startOfWeek.setHours(0,0,0,0);
+
+            const period = document.getElementById('billing-period-filter')?.value || 'month';
+            const filteredPastAppointments = pastAppointments.filter(apt => {
+                const aptDate = apt.appointmentTime.toDate();
+                if (period === 'month') return aptDate >= startOfMonth;
+                if (period === 'week') return aptDate >= startOfWeek;
+                return true;
+            });
+
+            const totalBilled = filteredPastAppointments
+                .reduce((sum, apt) => {
+                    const value = parseFloat(apt.paymentValue || 0);
+                    return isNaN(value) ? sum : sum + value;
+                }, 0);
+            const formattedBilled = totalBilled.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+            adminStatsContainer.innerHTML = `
+                <div class="dashboard-card flex items-center gap-4"><div class="bg-blue-100 p-3 rounded-full"><svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div><div><p class="text-gray-600">Próximas Consultas</p><p class="text-2xl font-bold">${upcomingAppointments.length}</p></div></div>
+                <div class="dashboard-card flex items-center gap-4"><div class="bg-green-100 p-3 rounded-full"><svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div><div><p class="text-gray-600">Consultas Realizadas</p><p class="text-2xl font-bold">${pastAppointments.length}</p></div></div>
+                <div class="dashboard-card flex items-start gap-4">
+                    <div class="bg-teal-100 p-3 rounded-full flex-shrink-0">
+                        <svg class="w-6 h-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                    </div>
+                    <div class="flex-grow">
+                        <div class="flex justify-between items-center">
+                            <p class="text-gray-600 whitespace-nowrap">Valor Faturado</p>
+                            <div id="billing-filter-container"></div>
+                        </div>
+                        <p class="text-2xl font-bold mt-1">${formattedBilled}</p>
+                    </div>
+                </div>`;
+            
+            const existingFilter = document.getElementById('billing-period-filter');
+            const currentPeriod = existingFilter ? existingFilter.value : 'month';
+            billingPeriodFilter.value = currentPeriod;
+            document.getElementById('billing-filter-container').appendChild(billingPeriodFilter);
+            
+            const nextAppointment = upcomingAppointments.sort((a,b) => a.appointmentTime.toMillis() - b.appointmentTime.toMillis())[0];
+            if(nextAppointment) {
+                const nextAptDate = nextAppointment.appointmentTime.toDate();
+                nextAppointmentInfo.innerHTML = `<strong>Próxima consulta:</strong> ${nextAppointment.patientInfo.fullName} em ${nextAptDate.toLocaleDateString('pt-BR')} às ${nextAptDate.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}.`;
+            } else {
+                nextAppointmentInfo.innerHTML = 'Nenhuma próxima consulta agendada.';
+            }
+
+            const today = new Date();
+            const uniquePatients = [...new Map(allAppointments.map(item => [item.patientInfo['fullName'], item])).values()];
+            const birthdayPatients = uniquePatients.filter(p => {
+                if (!p.patientInfo.dob) return false;
+                const dob = new Date(p.patientInfo.dob + 'T00:00:00');
+                return dob.getDate() === today.getDate() && dob.getMonth() === today.getMonth();
+            });
+
+            birthdayNotificationArea.innerHTML = '';
+            if (birthdayPatients.length > 0) {
+                birthdayNotificationArea.innerHTML = `
+                    <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-md" role="alert">
+                      <p class="font-bold">🎉 Aniversariantes do Dia!</p>
+                      <p>Parabéns para ${birthdayPatients.map(p => p.patientInfo.fullName).join(', ')}!</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function showAppointmentDetails(apt) {
+            modalPatientData.innerHTML = '';
+            const data = apt.patientInfo;
+            const labels = {
+                fullName: "Nome completo", email: "E-mail", phone: "Telefone", dob: "Data de nascimento",
+                cityState: "Cidade/Estado", profession: "Profissão", weight: "Peso (kg)", height: "Altura (cm)", 
+                healthConditions: "Condições de saúde", medications: "Medicamentos", mainMeals: "Refeições/dia", 
+                foodDiary: "Diário 24h", controlFoods: "Alimentos s/ controle", whyNow: "Por que começar agora", 
+                threeMonthGoal: "Meta para 3 meses"
+            };
+            
+            let hasData = false;
+            for(const key in labels) {
+                if(data[key]){
+                    hasData = true;
+                    modalPatientData.innerHTML += `<div class="py-2 border-b"><p class="font-semibold text-gray-700">${labels[key]}</p><p class="text-gray-600 whitespace-pre-wrap">${data[key]}</p></div>`;
+                }
+            }
+            if (!hasData) { modalPatientData.innerHTML = '<p class="text-gray-500">O paciente não preencheu o formulário.</p>'; }
+
+            const paymentValueInput = document.getElementById('payment-value');
+            paymentValueInput.value = apt.paymentValue || '';
+
+            paymentValueInput.oninput = () => {
+                clearTimeout(paymentTimeout);
+                paymentTimeout = setTimeout(async () => {
+                    const aptId = apt.id;
+                    const newValue = paymentValueInput.value;
+                    await updateDoc(doc(db, `consultations`, aptId), { paymentValue: newValue });
+                    
+                    const feedback = document.getElementById('payment-saved-feedback');
+                    feedback.classList.remove('hidden');
+                    setTimeout(() => feedback.classList.add('hidden'), 2000);
+                }, 1000);
+            };
+
+            adminNotesTextarea.value = apt.adminNotes || '';
+            adminNotesTextarea.oninput = () => {
+                clearTimeout(notesTimeout);
+                notesTimeout = setTimeout(async () => {
+                    await updateDoc(doc(db, `consultations`, apt.id), { adminNotes: adminNotesTextarea.value });
+                    const feedback = document.getElementById('notes-saved-feedback');
+                    feedback.classList.remove('hidden');
+                    setTimeout(() => feedback.classList.add('hidden'), 2000);
+                }, 1000);
+            };
+
+            modal.classList.remove('hidden');
+        }
+
+        async function fetchAndApplySettings() {
+            const settingsRef = doc(db, `settings/availability`);
+            try {
+                const docSnap = await getDoc(settingsRef);
+                if (docSnap.exists()) {
+                    const settingsData = docSnap.data();
+                    availabilitySettings = settingsData;
+                    
+                    Object.keys(settingsData).forEach(dayIndex => {
+                        if(isNaN(parseInt(dayIndex))) return;
+                        const dayData = settingsData[dayIndex];
+                        const container = document.querySelector(`.day-setting-container[data-day="${dayIndex}"]`);
+                        if(container) {
+                            const checkbox = container.querySelector('input[type="checkbox"]');
+                            const startTimeInput = container.querySelector('input[id^="start-time"]');
+                            const endTimeInput = container.querySelector('input[id^="end-time"]');
+                            checkbox.checked = dayData.enabled;
+                            startTimeInput.value = dayData.startTime;
+                            endTimeInput.value = dayData.endTime;
+                            startTimeInput.disabled = !dayData.enabled;
+                            endTimeInput.disabled = !dayData.enabled;
+                        }
+                    });
+                    renderBreaksList();
+                }
+            } catch (error) {
+                console.error("Erro ao buscar configurações:", error);
+            }
+        }
+        
+        function printDailyAgenda() {
+            const today = new Date();
+            const todaysAppointments = allAppointments
+                .filter(apt => apt.appointmentTime.toDate().toDateString() === today.toDateString())
+                .sort((a, b) => a.appointmentTime.toMillis() - b.appointmentTime.toMillis());
+            
+            const printArea = document.getElementById('print-area');
+            let content = `<h1 style="font-size: 24px; font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 10px; margin-bottom: 20px;">Agenda de ${today.toLocaleDateString('pt-BR')}</h1>`;
+            
+            if (todaysAppointments.length > 0) {
+                content += '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="text-align: left; background-color: #f2f2f2;"><th style="padding: 8px; border: 1px solid #ddd;">Horário</th><th style="padding: 8px; border: 1px solid #ddd;">Paciente</th><th style="padding: 8px; border: 1px solid #ddd;">Contato</th></tr></thead><tbody>';
+                todaysAppointments.forEach(apt => {
+                    const time = apt.appointmentTime.toDate().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
+                    content += `<tr><td style="padding: 8px; border: 1px solid #ddd;">${time}</td><td style="padding: 8px; border: 1px solid #ddd;">${apt.patientInfo.fullName}</td><td style="padding: 8px; border: 1px solid #ddd;">${apt.patientInfo.phone || ''}</td></tr>`;
+                });
+                content += '</tbody></table>';
+            } else {
+                content += '<p>Nenhuma consulta para hoje.</p>';
+            }
+            printArea.innerHTML = content;
+            window.print();
+        }
+
+        function setupPatientNameTooltips() {
+            ['scheduled-appointments-list', 'completed-appointments-list'].forEach(listId => {
+                const list = document.getElementById(listId);
+                list.addEventListener('mouseover', e => {
+                    if (e.target.classList.contains('patient-name')) {
+                        const patientName = e.target.dataset.patientName;
+                        const patientHistory = allAppointments
+                            .filter(apt => apt.patientInfo.fullName === patientName && apt.status === 'Realizado')
+                            .sort((a,b) => b.appointmentTime.toMillis() - a.appointmentTime.toMillis())
+                            .slice(0,3);
+                        
+                        if (patientHistory.length > 0) {
+                            let tooltipContent = '<strong>Últimas Consultas:</strong><ul style="margin:0; padding-left: 1rem;">';
+                            patientHistory.forEach(apt => {
+                                tooltipContent += `<li>${apt.appointmentTime.toDate().toLocaleDateString('pt-BR')}</li>`;
+                            });
+                            tooltipContent += '</ul>';
+                            historyTooltip.innerHTML = tooltipContent;
+
+                            const rect = e.target.getBoundingClientRect();
+                            historyTooltip.style.left = `${e.pageX + 15}px`;
+                            historyTooltip.style.top = `${e.pageY}px`;
+                            historyTooltip.style.display = 'block';
+                        }
+                    }
+                });
+                list.addEventListener('mouseout', e => {
+                    if (e.target.classList.contains('patient-name')) {
+                        historyTooltip.style.display = 'none';
+                    }
+                });
+            });
+        }
+
+        async function startApp() {
+            loadingOverlay.classList.remove('hidden');
+            setupSettingsModal();
+            await authenticate();
+            await fetchAndApplySettings();
+            setupPatientNameTooltips();
+
+            onSnapshot(query(collection(db, `consultations`)), (snapshot) => {
+                const newAppointments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                if (allAppointments.length > 0 && newAppointments.length > allAppointments.length) {
+                    const newAppointment = newAppointments.find(newApt => !allAppointments.some(oldApt => oldApt.id === newApt.id));
+                    if (newAppointment) {
+                        showAdminNotification(newAppointment);
+                    }
+                }
+                
+                allAppointments = newAppointments;
+                filterAndRenderAppointments();
+            }, (error) => { console.error("Firestore Error: ", error); });
+            loadingOverlay.classList.add('hidden');
+
+            if (window.location.hash === '#admin') {
+                adminLoginModal.classList.remove('hidden');
+            } else {
+                showView('patient');
+            }
+        }
+
+        startApp();
+    </script>
+</body>
+</html>
+
